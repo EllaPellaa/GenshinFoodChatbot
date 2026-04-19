@@ -43,3 +43,5 @@ React -> FastAPI -> Ollama local AI -> Tools -> Services -> Database
 Used ChatGPT for making the database structure correctly and inserting some example data to the database (although had to fix the data manually due to wrong information). 
 
 Asked Claude for help with implementing Ollama local AI to the main.py instead of a Gemini model. 
+
+Used ChatGPT for improving the prompts and instructions given to the AI in order to get more accurate answers.
