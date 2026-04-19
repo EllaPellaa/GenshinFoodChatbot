@@ -9,6 +9,20 @@ You can ask the chatbot, that is using local LLM model (ollama qwen2.5:7b used i
 This chatbot uses qwen2.5:7b local ai via ollama. You can start/download the local ai from the console with "ollama run qwen2.5:7b"
 (download ollama itself first before running this). This particular model runs fairly well with 16GB RAM and a RTX 2070 graphic card.
 
+## Running the project
+
+You can start the backend with the commands below.
+
+### Setting up the backend environment
+
+You can create a python virtual environment with ***python -m venv venv***. *You must be in the backend-folder before running this command.*
+
+Start the virtual environment with ***./venv/Scripts/activate***
+
+Download the dependencies with ***pip install -r requirements.txt***
+
+Start the backend with ***uvicorn main:app --reload***
+
 ## Architecture Overview
 - backend, frontend, LLM provider, and how they connect. A simple text description is fine (e.g., "React → FastAPI → Gemini API"). A diagram is a bonus.
 
@@ -24,4 +38,6 @@ React -> FastAPI -> Ollama local AI -> Tools -> Services -> Database
 — what doesn’t work, what’s hardcoded, what would need to change for production use. Be honest — this section is valued.
 
 ## AI tools used
-Used ChatGPT for making the database structure correctly and inserting some example data to the database (although had to fix the data manually due to wrong information).
+Used ChatGPT for making the database structure correctly and inserting some example data to the database (although had to fix the data manually due to wrong information). 
+
+Asked Claude for help with implementing Ollama local AI to the main.py instead of a Gemini model. 

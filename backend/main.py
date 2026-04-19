@@ -6,6 +6,7 @@ import json
 import os
 import time
 import ollama
+from typing import List, Dict, Any
 from collections import defaultdict
 
 from fastapi import FastAPI, HTTPException
@@ -14,12 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from tools import get_all_foods_tool, get_food_by_id_tool, get_food_by_name_tool, find_foods_by_ingredient_tool, get_all_ingredients_tool, get_ingredient_by_name_tool, get_ingredients_for_food_tool
+
 app = FastAPI(title="Genshin Impact Recipe Chatbot")
 
 # Allow requests from the React dev server
 app.add_middleware(
   CORSMiddleware,
-  allow_origins["http://localhost:5173"],
+  allow_origins=["http://localhost:5173"],
   allow_credentials=True,
   allow_methods=["*"],
   allow_headers=["*"],
@@ -49,5 +52,235 @@ def check_rate_limit(session_id: str) -> bool:
 class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []   # [{"role": "user"|"assistant", "content": "..."}]
+    session_id: str = "default"
+
+# ----- Define tools for Ollama -----
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_all_foods",
+            "description": "Get all foods from the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_food_by_id",
+            "description": "Get a food item from the database by id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "food_id": {
+                        "type": "integer",
+                        "description": "The ID of the food to search for."
+                    }
+                },
+                "required": ["food_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_food_by_name",
+            "description": "Get food items from the database by name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "food_name": {
+                        "type": "string",
+                        "description": "The name of the food to search for. Case insensitive, can search with parts of food name."
+                    }
+                },
+                "required": ["food_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_foods_by_ingredient",
+            "description": (
+                "Search foods that contain a specific ingredient from the database. "
+                "Use this whenever the user asks what foods use, contain, or include an ingredient "
+                "(e.g. carrots, cheese, crab). Always use this tool for ingredient-based queries."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ingredient_name": {
+                        "type": "string",
+                        "description": "Exact or partial ingredient name (e.g. 'carrot', 'crab roe')."
+                    }
+                },
+                "required": ["ingredient_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_all_ingredients",
+            "description": "Get all ingredients from the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_ingredient_by_name",
+            "description": "Get ingredient from the database by name. ",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "food_name": {
+                        "type": "string",
+                        "description": "The name of the ingredient to search for. Case insensitive, has to be exact with no plural etc. (carrots -> carrot before searching)"
+                    }
+                },
+                "required": ["food_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_ingredients_for_food",
+            "description": "Get all ingredient names and their amounts for a food item by the food item id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "food_name": {
+                        "type": "integer",
+                        "description": "The id of the food that's ingredients are fetched."
+                    }
+                },
+                "required": ["food_name"]
+            }
+        }
+    },
+]
+
+TOOL_IMPLEMENTATIONS = {
+    "get_all_foods": get_all_foods_tool,
+    "get_food_by_id": get_food_by_id_tool,
+    "get_food_by_name": get_food_by_name_tool,
+    "find_foods_by_ingredient": find_foods_by_ingredient_tool,
+    "get_all_ingredients": get_all_ingredients_tool,
+    "get_ingredient_by_name": get_ingredient_by_name_tool,
+    "get_ingredients_for_food": get_ingredients_for_food_tool
+}
+
+# ----- Execute the tool calls -----
+def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
+    """
+    Execute a tool function and return result as string.
+    Args:   tool_name - Name of the tool that's to be executed
+            tool_args - Arguments of the tool
+    Returns: The tool result as JSON string
+    """
+    if tool_name not in TOOL_IMPLEMENTATIONS:
+        return json.dumps({"error": f"Tool '{tool_name}' not found"})
+    
+    try:
+        tool_function = TOOL_IMPLEMENTATIONS[tool_name]
+        # Actually calling the tool itself
+        result = tool_function(**tool_args)
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"error": f"Tool execution failed: {str(e)}"})
+
+
+
+
+# ----- Processing tool calls -----
+def process_tool_calls(messages: List[Dict[str, str]], response: Dict[str, Any]) -> List[Dict[str, str]]:
+    """
+    Handling tool calls.
+    Parameters: messages - conversation history
+                response - Response from Ollama containing tool call
+    Returns: Updates messages-list with tool call results
+    """
+    if not response["message"].get("tool_calls"):
+        return messages
+    
+    # Add the assistant's previous response with tool calls to the messages
+    messages.append(response["message"])
+
+    # Execute each tool call
+    for tool_call in response["message"]["tool_calls"]:
+        tool_name = tool_call["function"]["name"]
+        tool_args = tool_call["function"]["arguments"]
+
+        # Execute the tool
+        tool_result = execute_tool(tool_name, tool_args)
+
+        # Add tool result to the previous conversation
+        messages.append({
+            "role": "tool",
+            "content": tool_result
+        })
+
+    return messages
+
 
 # ----- Endpoints -----
+
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+# Normal chat with no stream
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """
+    Non-streaming endpoint - returns the full response at once.
+    Tool calling is in a loop until no more tools are needed.
+    """
+    if not check_rate_limit(request.session_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a moment.")
+    
+    # Give the LLM a prompt.
+    system_prompt = """
+    You are a database assistant for a food system.
+
+    IMPORTANT RULES:
+    - If the user asks about ingredients (e.g. "what foods use carrots"), you MUST call find_food_by_ingredient.
+    - Never answer from memory when tools are available.
+    - Always prefer tools for database questions.
+    """
+
+    # Build the full conversation: history + new user message
+    messages = request.history + [{"role": "user", "content": request.message}] + [{"role": "system", "content": system_prompt}]
+    
+    # Looping the AI until it doesn't need the tools
+    max_steps = 5
+    steps = 0
+    while True:
+        steps += 1
+        if steps > max_steps:
+            break
+        response = ollama.chat(
+            model="qwen2.5:7b",
+            messages=messages,
+            tools=TOOLS
+        )
+
+        if not response["message"].get("tool_calls"):
+            final_text = response["message"]["content"]
+            return {
+                "response": final_text
+            }
+        
+        messages = process_tool_calls(messages, response)

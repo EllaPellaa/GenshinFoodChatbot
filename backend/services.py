@@ -53,3 +53,39 @@ def find_foods_by_ingredient(ingredient_name):
   foods = [dict(row) for row in cursor.fetchall()]
   conn.close()
   return foods
+
+def get_all_ingredients():
+  """Get all ingredients from the database."""
+  conn = get_db()
+  cursor = conn.cursor()
+  cursor.execute("SELECT * FROM ingredients")
+  ingredients = [dict(row) for row in cursor.fetchall()]
+  conn.close()
+  return ingredients
+
+def get_ingredient_by_name(ingredient_name):
+  """Get an ingredient from the database by name"""
+  conn = get_db()
+  cursor = conn.cursor()
+  cursor.execute("SELECT * FROM ingredients WHERE LOWER(name) = LOWER(?)", (ingredient_name,))
+
+  ingredients = [dict(row) for row in cursor.fetchall()]
+  conn.close()
+  return ingredients
+
+def get_ingredients_for_food(food_id: int):
+  """Get all ingredients and their amounts for a specific food by id."""
+  conn = get_db()
+  cursor = conn.cursor()
+
+  cursor.execute("""
+    SELECT i.name AS ingredient, fi.amount
+    FROM food_ingredients fi
+    JOIN ingredients i ON i.id = fi.ingredient_id
+    WHERE fi.food_id = ?
+  """, (food_id,))
+
+  ingredients = [dict(row) for row in cursor.fetchall()]
+  conn.close()
+  return ingredients
+  
