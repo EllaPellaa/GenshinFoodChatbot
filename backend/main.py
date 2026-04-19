@@ -260,7 +260,7 @@ async def chat(request: ChatRequest):
     
     # Give the LLM a prompt.
     system_prompt = """
-    You are a database assistant for looking for foods and ingredients from the gama Genshin Impact.
+    You are a database assistant for looking for foods and ingredients from the game Genshin Impact.
 
     IMPORTANT RULES:
     - If the user asks about ingredients (e.g. "what foods use carrots"), you MUST call find_food_by_ingredient.
@@ -274,10 +274,10 @@ async def chat(request: ChatRequest):
     Never confuse these two directions.
     """
 
-    # Build the full conversation: history + new user message
-    messages = request.history + [{"role": "user", "content": request.message}] + [{"role": "system", "content": system_prompt}]
+    # Build the full conversation: sys prompt + history + new user message
+    messages = [{"role": "system", "content": system_prompt}] + request.history + [{"role": "user", "content": request.message}]
     
-    # Looping the AI until it doesn't need the tools
+    # Looping the AI until it doesn't need the tools, make sure it doesn't start looping more than 5 times (This many tools most likely not needed).
     max_steps = 5
     steps = 0
     while True:
@@ -297,3 +297,86 @@ async def chat(request: ChatRequest):
             }
         
         messages = process_tool_calls(messages, response)
+
+# Chat with stream
+@app.post("/chat_stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming endpoint using Server-Sent Events (SSE)
+    """
+
+    if not check_rate_limit(request.session_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded.")
+    
+    # ----- Tool calls before generating an answer with streaming -----
+    #       Streaming not needed when calling tools, since the tool calling just passes along the full answer
+    #       to the next loop without giving it to user.
+
+    # Give the LLM a prompt so it functions better.
+    system_prompt = """
+    You are a database assistant for looking for foods and ingredients from the game Genshin Impact.
+
+    IMPORTANT RULES:
+    - If the user asks about ingredients (e.g. "what foods use carrots"), you MUST call find_food_by_ingredient.
+    - Never answer from memory when tools are available.
+    - Always prefer tools for database questions.
+
+    Tool usage rules:
+    - If the user gives an INGREDIENT and asks for foods → use find_foods_by_ingredient
+    - If the user gives a FOOD and asks for ingredients → use get_ingredients_for_food
+
+    Never confuse these two directions.
+    """
+
+    # Build the full conversation: sys prompt + history + new user message
+    messages = [{"role": "system", "content": system_prompt}] + request.history + [{"role": "user", "content": request.message}]
+
+    # Looping the AI until it doesn't need the tools, make sure it doesn't start looping more than 5 times (This many tools most likely not needed).
+    max_steps = 5
+    steps = 0
+    while True:
+        steps += 1
+        if steps > max_steps:
+            break
+        response = ollama.chat(
+            model="qwen2.5:7b",
+            messages=messages,
+            tools=TOOLS
+        )
+
+        # Break from loop if tool calls not needed
+        if not response["message"].get("tool_calls"):
+            break
+        
+        # Call tools if needed
+        messages = process_tool_calls(messages, response)
+
+    def generate():
+        # We already have the messages from earlier, no need to define that again inside generate
+        response = ollama.chat(
+            model="qwen2.5:7b",
+            messages=messages,
+            tools=TOOLS,
+            stream=True
+        )
+
+        for chunk in response:
+            content = chunk["message"]["content"]
+            if content:
+                yield f"data: {json.dumps({'type': 'text', 'content': content})}\n\n"
+
+        # Send event to indicate the stream is done
+        done_event = json.dumps({
+            "type": "done",
+        })
+        yield f"data: {done_event}\n\n"
+
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # tells nginx: don't buffer this
+        },
+    )
