@@ -68,9 +68,9 @@ def get_ingredient_by_name_tool(ingredient_name: str):
   return {"found": True, "ingredients": result}
 
 # Get all ingredients and their amounts for a specific food by id
-def get_ingredients_for_food_tool(food_id: int):
-  """Get all ingredients and their amounts for a food item by id"""
-  result = get_ingredients_for_food(food_id)
+def get_ingredients_for_food_tool(food_name: str):
+  """Get all ingredients and their amounts for a food item by name"""
+  result = get_ingredients_for_food(food_name)
   if not result:
     return {"found": False, "ingredients": []}
   

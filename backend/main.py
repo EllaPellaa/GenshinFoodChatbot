@@ -107,9 +107,10 @@ TOOLS = [
         "function": {
             "name": "find_foods_by_ingredient",
             "description": (
-                "Search foods that contain a specific ingredient from the database. "
-                "Use this whenever the user asks what foods use, contain, or include an ingredient "
-                "(e.g. carrots, cheese, crab). Always use this tool for ingredient-based queries."
+                "Find foods that USE a specific ingredient. "
+                "Use this when the user asks: 'what foods contain X' or 'what uses carrots'. "
+                "Example: 'What foods use carrots?' → use this tool."
+                "Input is an ingredient name, output is a list of foods."
             ),
             "parameters": {
                 "type": "object",
@@ -156,13 +157,18 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_ingredients_for_food",
-            "description": "Get all ingredient names and their amounts for a food item by the food item id.",
+            "description": (
+                "Get INGREDIENTS of a specific FOOD. "
+                "Use this when the user asks: 'what ingredients does X have' or 'what is in X'. "
+                "Example: 'What ingredients are in Sticky Honey Roast?' → use this tool."
+                "Input is a food name, output is a list of ingredients."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "food_name": {
-                        "type": "integer",
-                        "description": "The id of the food that's ingredients are fetched."
+                        "type": "string",
+                        "description": "The name of the food that's ingredients are fetched."
                     }
                 },
                 "required": ["food_name"]
@@ -221,6 +227,7 @@ def process_tool_calls(messages: List[Dict[str, str]], response: Dict[str, Any])
     for tool_call in response["message"]["tool_calls"]:
         tool_name = tool_call["function"]["name"]
         tool_args = tool_call["function"]["arguments"]
+        print("TOOL CALLS:", response["message"].get("tool_calls"))
 
         # Execute the tool
         tool_result = execute_tool(tool_name, tool_args)
@@ -253,12 +260,18 @@ async def chat(request: ChatRequest):
     
     # Give the LLM a prompt.
     system_prompt = """
-    You are a database assistant for a food system.
+    You are a database assistant for looking for foods and ingredients from the gama Genshin Impact.
 
     IMPORTANT RULES:
     - If the user asks about ingredients (e.g. "what foods use carrots"), you MUST call find_food_by_ingredient.
     - Never answer from memory when tools are available.
     - Always prefer tools for database questions.
+
+    Tool usage rules:
+    - If the user gives an INGREDIENT and asks for foods → use find_foods_by_ingredient
+    - If the user gives a FOOD and asks for ingredients → use get_ingredients_for_food
+
+    Never confuse these two directions.
     """
 
     # Build the full conversation: history + new user message
