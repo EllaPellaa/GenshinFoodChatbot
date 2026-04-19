@@ -19,7 +19,7 @@ You can download ollama to your machine from ***https://www.ollama.com/download*
 
 ##### Setting up the backend environment
 
-You can create a python virtual environment with ***python -m venv venv***. *You must be in the backend-folder before running this command.*
+You can create a python virtual environment with ***python -m venv venv***. **You must be in the backend-folder before running this command.**
 
 Start the virtual environment with ***./venv/Scripts/activate***
 
@@ -32,6 +32,11 @@ Start the backend with ***uvicorn main:app --reload***
 
 ##### Setting up the frontend environment
 
+Install the dependencies by running ***npm install***
+
+Run the frontend application with ***npm run dev***
+
+**You need to be in the frontend-folder before running these commands**
 
 ## Architecture Overview
 
