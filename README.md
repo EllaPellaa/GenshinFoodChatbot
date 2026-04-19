@@ -45,7 +45,11 @@ React -> FastAPI -> Ollama local AI -> Tools -> Services (-> Helpers) -> Databas
 ## Technical Choises
 - which libraries/frameworks you used and why (e.g., "LangGraph for multi-step reasoning because our app needs conditional routing between tools") 
 
-This application used react
+This application used React for frontend so the implementation of the UI would be easier. 
+
+FastAPI, SQLite and Ollama libraries were used for an easy implementation of the api logic and streaming, easy local database, and the usage for local ai. The Ollama library supports the tool calling as well. The CORS middleware (from FastAPI) allows the React frontend to communicate with the backend. 
+
+The python-dotenv library was included, but was not used yet since no api keys were needed. It's included mainly for future development purposes.
 
 ## Known Limitations
 — what doesn’t work, what’s hardcoded, what would need to change for production use. Be honest — this section is valued.
