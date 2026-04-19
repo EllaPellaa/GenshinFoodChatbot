@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import './App.css'
+import ChatInput from './components/ChatInput'
+import MessageList from './components/MessageList'
+import UsageBar from './components/UsageBar'
 
 // Generate a stable session ID per browser tab
 const SESSION_ID = `session-${Math.random().toString(36).slice(2, 9)}`
@@ -7,14 +10,14 @@ const SESSION_ID = `session-${Math.random().toString(36).slice(2, 9)}`
 // API address
 const API_BASE = 'http://localhost:8000'
 
-function App() {
+export default function App() {
   const [messages, setMessages] = useState([])
   const [isStreaming, setIsStreaming] = useState(false)
-  const [steamingEnabled, setStreamingEnabled] = useState(true)
+  const [streamingEnabled, setStreamingEnabled] = useState(true)
   const [lastUsage, setLastUsage] = useState(null)
   const [error, setError] = useState(null)
 
-  async function sendMessages(text) {
+  async function sendMessage(text) {
     if (!text.trim() || isStreaming) return
 
     setError(null)
@@ -31,7 +34,7 @@ function App() {
       if (streamingEnabled) {
         await streamResponse(text, history, updatedMessages)
       } else {
-        await fetchResponse(text, history, updatedMessaes)
+        await fetchResponse(text, history, updatedMessages)
       }
     } catch (err) {
       setError(err.message)
@@ -117,21 +120,35 @@ function App() {
   }
 
   return (
-    <div className='app'>
-      <section id="center">
-        <div>
-          <h1>Genshin Impact Recipe Chatbot</h1>
+    <div className="app">
+      <header className="header">
+        <div className="header-title">
+          <h1>Genshin Impact food Chatbot</h1>
+          <span className="session-id">Session: {SESSION_ID}</span>
         </div>
-        
-      </section>
+        <div className="header-controls">
+          <label className="streaming-toggle">
+            <input
+              type="checkbox"
+              checked={streamingEnabled}
+              onChange={(e) => setStreamingEnabled(e.target.checked)}
+              disabled={isStreaming}
+            />
+            <span>Streaming</span>
+          </label>
+          <button onClick={clearChat} className="btn-clear" disabled={isStreaming}>
+            Clear chat
+          </button>
+        </div>
+      </header>
 
-      <section id="next-steps">
-        
-      </section>
+      {lastUsage && <UsageBar usage={lastUsage} />}
 
-      <section id="spacer"></section>
+      {error && <div className="error-banner">{error}</div>}
+
+      <MessageList messages={messages} isStreaming={isStreaming} />
+
+      <ChatInput onSend={sendMessage} disabled={isStreaming} />
     </div>
   )
 }
-
-export default App

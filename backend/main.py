@@ -299,7 +299,7 @@ async def chat(request: ChatRequest):
         messages = process_tool_calls(messages, response)
 
 # Chat with stream
-@app.post("/chat_stream")
+@app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """
     Streaming endpoint using Server-Sent Events (SSE)
